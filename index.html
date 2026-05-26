@@ -106,7 +106,9 @@
     #menubar-left { display: flex; align-items: stretch; height: 100%; }
     #apple-menu {
       width: 32px; display: flex; align-items: center; justify-content: center;
-      font-size: 14px; cursor: pointer; border-right: 1px solid rgba(0,0,0,0.1);
+      font-size: 13px; font-weight: bold; cursor: pointer;
+      border-right: 1px solid rgba(0,0,0,0.15);
+      font-family: var(--font-system);
     }
     #apple-menu:hover, #apple-menu:active { background: var(--mac-highlight); color: #fff; }
     .menu-item {
@@ -123,7 +125,7 @@
     .dropdown {
       position: absolute; top: 24px; left: 0;
       background: var(--mac-bg); border: 1px solid #000;
-      padding: 2px 0; z-index: 500; min-width: 180px;
+      padding: 2px 0; z-index: 500; min-width: 190px;
       display: none; box-shadow: 2px 2px 0 #000;
     }
     .dropdown.open { display: block; }
@@ -239,7 +241,7 @@
     }
     .tree-item:hover, .tree-item:active { background: #d0dce8; }
     .tree-item.active { background: var(--mac-highlight); color: #fff; }
-    .tree-item .icon { font-size: 12px; flex-shrink: 0; }
+    .tree-item .icon { font-size: 11px; flex-shrink: 0; font-family: var(--font-mono); color: #555; }
     .tree-item .name { overflow: hidden; text-overflow: ellipsis; flex: 1; }
     .tree-folder { font-weight: bold; }
     .tree-folder .arrow { font-size: 10px; width: 12px; flex-shrink: 0; }
@@ -409,32 +411,21 @@
     .toast.info    { border-left: 4px solid #808080; }
     @keyframes macSlideIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-    /* ═══════════════════════════════════════════════════════
-       PREVIEW WINDOW
-       ═══════════════════════════════════════════════════════ */
+    /* ── PREVIEW WINDOW ── */
     #preview-window {
-      position: fixed;
-      top: 40px; left: 40px;
-      width: calc(100vw - 80px);
-      height: calc(100vh - 80px);
-      z-index: 500;
-      display: none;
-      flex-direction: column;
-      background: var(--mac-bg);
-      border: 2px solid #000;
+      position: fixed; top: 40px; left: 40px;
+      width: calc(100vw - 80px); height: calc(100vh - 80px);
+      z-index: 500; display: none; flex-direction: column;
+      background: var(--mac-bg); border: 2px solid #000;
       box-shadow: 4px 4px 0 #000, 1px 1px 0 #fff inset, -1px -1px 0 #808080 inset;
       min-width: 300px; min-height: 200px;
     }
     #preview-window.open { display: flex; }
-
-    /* Preview title bar */
     #preview-title-bar {
       height: 26px; border-bottom: 1px solid #000;
       display: flex; align-items: center; padding: 0 4px; gap: 4px;
       flex-shrink: 0;
-      background: repeating-linear-gradient(
-        180deg, #d0d0d0 0px, #d0d0d0 1px, #a0a0a0 1px, #a0a0a0 2px
-      );
+      background: repeating-linear-gradient(180deg, #d0d0d0 0px, #d0d0d0 1px, #a0a0a0 1px, #a0a0a0 2px);
       cursor: move; user-select: none; position: relative;
     }
     #preview-title-text {
@@ -442,13 +433,9 @@
       font-size: 12px; font-weight: bold; background: var(--mac-bg);
       padding: 1px 8px; white-space: nowrap; font-family: var(--font-system);
     }
-
-    /* Preview toolbar / address bar */
     #preview-toolbar {
-      height: 32px; background: var(--mac-bg);
-      border-bottom: 1px solid #000;
-      display: flex; align-items: center;
-      padding: 0 6px; gap: 4px; flex-shrink: 0;
+      height: 32px; background: var(--mac-bg); border-bottom: 1px solid #000;
+      display: flex; align-items: center; padding: 0 6px; gap: 4px; flex-shrink: 0;
       box-shadow: 0 1px 0 #fff;
     }
     #preview-back, #preview-fwd, #preview-refresh, #preview-newtab {
@@ -456,60 +443,31 @@
       background: var(--mac-bg); cursor: pointer;
       font-size: 11px; font-family: var(--font-system); font-weight: bold;
       box-shadow: 1px 1px 0 #fff inset, -1px -1px 0 #808080 inset;
-      white-space: nowrap;
-      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap; -webkit-tap-highlight-color: transparent;
     }
-    #preview-back:hover, #preview-fwd:hover,
-    #preview-refresh:hover, #preview-newtab:hover { background: #d0d0d0; }
-    #preview-back:active, #preview-fwd:active,
-    #preview-refresh:active, #preview-newtab:active {
-      box-shadow: 1px 1px 0 #808080 inset, -1px -1px 0 #fff inset;
-      background: #aaa;
+    #preview-back:hover, #preview-fwd:hover, #preview-refresh:hover, #preview-newtab:hover { background: #d0d0d0; }
+    #preview-back:active, #preview-fwd:active, #preview-refresh:active, #preview-newtab:active {
+      box-shadow: 1px 1px 0 #808080 inset, -1px -1px 0 #fff inset; background: #aaa;
     }
     #preview-url-bar {
-      flex: 1; height: 20px; padding: 0 6px;
-      border: 1px solid #000; background: #fff;
-      font-size: 11px; font-family: var(--font-mono);
-      outline: none; box-shadow: 1px 1px 0 #808080 inset;
-      color: #000;
+      flex: 1; height: 20px; padding: 0 6px; border: 1px solid #000; background: #fff;
+      font-size: 11px; font-family: var(--font-mono); outline: none;
+      box-shadow: 1px 1px 0 #808080 inset; color: #000;
       -webkit-user-select: text; user-select: text;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-
-    /* Preview iframe container */
-    #preview-frame-wrap {
-      flex: 1; overflow: hidden; position: relative;
-      background: #fff;
-      border-top: none;
-    }
-    #preview-iframe {
-      width: 100%; height: 100%; border: none;
-      display: block; background: #fff;
-    }
-
-    /* Preview status bar */
+    #preview-frame-wrap { flex: 1; overflow: hidden; position: relative; background: #fff; }
+    #preview-iframe { width: 100%; height: 100%; border: none; display: block; background: #fff; }
     #preview-statusbar {
       height: 18px; background: var(--mac-bg); border-top: 1px solid #000;
       display: flex; align-items: center; padding: 0 8px;
       font-size: 10px; font-family: var(--font-system);
-      flex-shrink: 0; box-shadow: 0 -1px 0 #fff;
-      gap: 8px;
+      flex-shrink: 0; box-shadow: 0 -1px 0 #fff; gap: 8px;
     }
     #preview-status-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #preview-type-badge {
-      background: #000080; color: #fff;
-      padding: 0 5px; font-size: 10px; border: 1px solid #000;
-      white-space: nowrap;
-    }
-
-    /* Resize handle for preview window */
+    #preview-type-badge { background: #000080; color: #fff; padding: 0 5px; font-size: 10px; border: 1px solid #000; white-space: nowrap; }
     #preview-resize {
-      position: absolute; bottom: 0; right: 0;
-      width: 14px; height: 14px; cursor: se-resize;
-      background: repeating-linear-gradient(
-        -45deg, transparent, transparent 2px,
-        #808080 2px, #808080 3px
-      );
+      position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; cursor: se-resize;
+      background: repeating-linear-gradient(-45deg, transparent, transparent 2px, #808080 2px, #808080 3px);
     }
 
     /* ── iPad tweaks ── */
@@ -536,7 +494,7 @@
 </head>
 <body>
 
-<!-- ── BOOT SCREEN ── -->
+<!-- BOOT SCREEN -->
 <div id="boot-screen">
   <div id="boot-card">
     <div id="boot-top">
@@ -571,14 +529,14 @@
   </div>
 </div>
 
-<!-- ── APP ── -->
+<!-- APP -->
 <div id="app">
   <div id="desktop"></div>
 
-  <!-- Menu bar -->
   <div id="menubar">
     <div id="menubar-left">
-      <div id="apple-menu">&#63743;</div>
+      <div id="apple-menu">Apple</div>
+
       <div class="menu-wrap">
         <div class="menu-item" onclick="toggleMenu('file-menu')">File</div>
         <div class="dropdown" id="file-menu">
@@ -591,6 +549,7 @@
           <div class="dropdown-item" onclick="if(state.activeTabId)closeTab(state.activeTabId);closeMenus()">Close Tab <span class="shortcut">Ctrl+W</span></div>
         </div>
       </div>
+
       <div class="menu-wrap">
         <div class="menu-item" onclick="toggleMenu('edit-menu')">Edit</div>
         <div class="dropdown" id="edit-menu">
@@ -601,6 +560,7 @@
           <div class="dropdown-item" onclick="openFind();closeMenus()">Find / Replace&hellip; <span class="shortcut">Ctrl+F</span></div>
         </div>
       </div>
+
       <div class="menu-wrap">
         <div class="menu-item" onclick="toggleMenu('view-menu')">View</div>
         <div class="dropdown" id="view-menu">
@@ -612,6 +572,7 @@
           <div class="dropdown-item" onclick="changeFontSize(-1);closeMenus()">Smaller Text <span class="shortcut">Ctrl+-</span></div>
         </div>
       </div>
+
       <div class="menu-wrap">
         <div class="menu-item" onclick="toggleMenu('help-menu')">Help</div>
         <div class="dropdown" id="help-menu">
@@ -626,7 +587,6 @@
     </div>
   </div>
 
-  <!-- IDE Window -->
   <div id="ide-window">
     <div id="title-bar">
       <div class="win-btn">x</div>
@@ -644,7 +604,7 @@
       <div class="sep"></div>
       <button class="mac-btn" id="btn-find">Find</button>
       <div class="sep"></div>
-      <button class="mac-btn green" id="btn-preview" title="Preview current file (Ctrl+P)">&#9654; Preview</button>
+      <button class="mac-btn green" id="btn-preview">Preview</button>
       <div class="spacer"></div>
       <input id="search-box" type="text" placeholder="Filter files..." />
       <div class="sep"></div>
@@ -654,7 +614,7 @@
     <!-- iPad quick-key bar -->
     <div id="ipad-shortcut-bar">
       <button class="ipad-key accent" onclick="saveTab(activeTab())">Save</button>
-      <button class="ipad-key green-key" onclick="openPreview()">&#9654; Preview</button>
+      <button class="ipad-key green-key" onclick="openPreview()">Preview</button>
       <button class="ipad-key" onclick="openFind()">Find</button>
       <div class="ksep"></div>
       <button class="ipad-key" onclick="ipadInsert('    ')">Tab</button>
@@ -664,7 +624,7 @@
       <button class="ipad-key" onclick="ipadInsert('&quot;&quot;')">" "</button>
       <button class="ipad-key" onclick="ipadInsert('``')">`  `</button>
       <div class="ksep"></div>
-      <button class="ipad-key" onclick="ipadInsert('=>')">=></button>
+      <button class="ipad-key" onclick="ipadInsert('=>')">=&gt;</button>
       <button class="ipad-key" onclick="ipadInsert('!==')">!==</button>
       <button class="ipad-key" onclick="ipadInsert('===')">===</button>
       <button class="ipad-key" onclick="ipadInsert('&&')">&amp;&amp;</button>
@@ -678,7 +638,7 @@
       <div id="sidebar">
         <div id="sidebar-header"><span id="folder-name">EXPLORER</span></div>
         <div id="file-tree">
-          <div class="tree-empty">No folder open.<br><br>Tap <strong>Open Folder</strong><br>to begin.</div>
+          <div class="tree-empty">No folder open.<br><br>Click <strong>Open Folder</strong><br>to begin.</div>
         </div>
       </div>
       <div id="resizer"></div>
@@ -740,38 +700,27 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════
-     PREVIEW WINDOW
-     ═══════════════════════════════════════════════════════ -->
+<!-- PREVIEW WINDOW -->
 <div id="preview-window">
-  <!-- Title bar -->
   <div id="preview-title-bar">
     <div class="win-btn" onclick="closePreview()">x</div>
     <div class="win-btn" onclick="togglePreviewSize()">o</div>
     <div id="preview-title-text">Preview -- Untitled</div>
   </div>
-
-  <!-- Browser-style toolbar -->
   <div id="preview-toolbar">
-    <button id="preview-back"    onclick="document.getElementById('preview-iframe').contentWindow.history.back()">&#9664;</button>
-    <button id="preview-fwd"     onclick="document.getElementById('preview-iframe').contentWindow.history.forward()">&#9654;</button>
-    <button id="preview-refresh" onclick="refreshPreview()">&#8635;</button>
+    <button id="preview-back"    onclick="document.getElementById('preview-iframe').contentWindow.history.back()">&lt;</button>
+    <button id="preview-fwd"     onclick="document.getElementById('preview-iframe').contentWindow.history.forward()">&gt;</button>
+    <button id="preview-refresh" onclick="refreshPreview()">Refresh</button>
     <input  id="preview-url-bar" type="text" readonly placeholder="-- no preview --" />
-    <button id="preview-newtab"  onclick="openPreviewNewTab()">&#8599; New Tab</button>
+    <button id="preview-newtab"  onclick="openPreviewNewTab()">New Tab</button>
   </div>
-
-  <!-- iframe -->
   <div id="preview-frame-wrap">
     <iframe id="preview-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" title="Preview"></iframe>
   </div>
-
-  <!-- Status bar -->
   <div id="preview-statusbar">
     <span id="preview-status-text">No preview loaded</span>
     <span id="preview-type-badge">HTML</span>
   </div>
-
-  <!-- Resize corner -->
   <div id="preview-resize"></div>
 </div>
 
@@ -873,91 +822,66 @@ function changeFontSize(d) {
   document.addEventListener('touchend', function () { dragging = false; });
 }());
 
-/* ═══════════════════════════════════════════════════════
-   PREVIEW SYSTEM
-   ═══════════════════════════════════════════════════════ */
-
+/* ── PREVIEW ── */
 var previewBlobUrl = null;
 var previewMaximised = false;
-var previewOrigRect  = null;
+var previewOrigRect = null;
 
 function openPreview() {
   var tab = activeTab();
   var pw  = document.getElementById('preview-window');
+  if (!tab) { toast('No file open to preview.', 'info'); return; }
 
-  if (!tab) {
-    toast('No file open to preview.', 'info'); return;
-  }
-
-  // Determine what to render
-  var ext     = tab.name.split('.').pop().toLowerCase();
+  var ext = tab.name.split('.').pop().toLowerCase();
   var content = tab.content;
   var title   = tab.name;
   var mime, badge;
 
   if (['html','htm'].includes(ext)) {
-    mime  = 'text/html';
-    badge = 'HTML';
-    // Inject a <base> tag so relative resources resolve, if possible
+    mime = 'text/html'; badge = 'HTML';
     if (!content.includes('<base')) {
       content = content.replace(/(<head[^>]*>)/i, '$1<base target="_blank">');
     }
   } else if (['md','mdx'].includes(ext)) {
-    // Render Markdown as simple HTML
-    badge   = 'Markdown';
-    mime    = 'text/html';
+    badge = 'Markdown'; mime = 'text/html';
     content = markdownToHtml(content, title);
   } else if (['css','scss','sass','less'].includes(ext)) {
-    badge   = 'CSS';
-    mime    = 'text/html';
+    badge = 'CSS'; mime = 'text/html';
     content = '<html><head><meta charset="UTF-8"><title>' + title + '</title></head>'
       + '<body style="font-family:monospace;background:#1e1e2e;color:#cdd6f4;padding:20px;white-space:pre-wrap">'
       + escHtml(content) + '</body></html>';
   } else if (['js','ts','mjs'].includes(ext)) {
-    badge   = 'JavaScript';
-    mime    = 'text/html';
-    // Wrap JS in a runnable HTML sandbox with console output capture
+    badge = 'JavaScript'; mime = 'text/html';
     content = jsPreviewHtml(content, title);
   } else if (ext === 'svg') {
-    badge   = 'SVG';
-    mime    = 'text/html';
+    badge = 'SVG'; mime = 'text/html';
     content = '<html><head><meta charset="UTF-8"><title>' + title + '</title>'
       + '<style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff}</style></head>'
       + '<body>' + content + '</body></html>';
   } else if (['json','jsonc'].includes(ext)) {
-    badge   = 'JSON';
-    mime    = 'text/html';
-    try { var pretty = JSON.stringify(JSON.parse(content), null, 2); content = pretty; } catch(e) {}
+    badge = 'JSON'; mime = 'text/html';
+    try { content = JSON.stringify(JSON.parse(content), null, 2); } catch(e) {}
     content = '<html><head><meta charset="UTF-8"><title>' + title + '</title>'
       + '<style>body{font-family:monospace;font-size:13px;background:#f5f5f5;color:#222;padding:20px;white-space:pre-wrap;word-break:break-word}</style></head>'
       + '<body>' + escHtml(content) + '</body></html>';
   } else {
-    // Plain text fallback
-    badge   = ext.toUpperCase() || 'TXT';
-    mime    = 'text/html';
+    badge = ext.toUpperCase() || 'TXT'; mime = 'text/html';
     content = '<html><head><meta charset="UTF-8"><title>' + title + '</title>'
       + '<style>body{font-family:monospace;font-size:13px;background:#fff;color:#000;padding:20px;white-space:pre-wrap;word-break:break-word}</style></head>'
       + '<body>' + escHtml(content) + '</body></html>';
   }
 
-  // Revoke old blob
   if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); previewBlobUrl = null; }
-
-  // Create blob URL
   var blob = new Blob([content], { type: mime });
   previewBlobUrl = URL.createObjectURL(blob);
 
-  // Load into iframe
   var iframe = document.getElementById('preview-iframe');
   iframe.src = previewBlobUrl;
 
-  // Update UI
   document.getElementById('preview-title-text').textContent = 'Preview -- ' + title;
   document.getElementById('preview-url-bar').value = 'preview://' + (tab.path || title);
   document.getElementById('preview-status-text').textContent = 'Loaded: ' + title;
   document.getElementById('preview-type-badge').textContent  = badge;
-
-  // Show window
   pw.classList.add('open');
 }
 
@@ -968,129 +892,93 @@ function closePreview() {
   previewMaximised = false;
 }
 
-function refreshPreview() {
-  openPreview(); // re-renders from current editor content
-}
+function refreshPreview() { openPreview(); }
 
 function openPreviewNewTab() {
-  if (previewBlobUrl) {
-    window.open(previewBlobUrl, '_blank');
-  } else {
-    toast('Open a preview first.', 'info');
-  }
+  if (previewBlobUrl) window.open(previewBlobUrl, '_blank');
+  else toast('Open a preview first.', 'info');
 }
 
 function togglePreviewSize() {
   var pw = document.getElementById('preview-window');
   if (!previewMaximised) {
-    previewOrigRect = {
-      top: pw.style.top, left: pw.style.left,
-      width: pw.style.width, height: pw.style.height
-    };
-    pw.style.top    = '24px';
-    pw.style.left   = '0';
-    pw.style.width  = '100vw';
-    pw.style.height = 'calc(100vh - 24px)';
+    previewOrigRect = { top: pw.style.top, left: pw.style.left, width: pw.style.width, height: pw.style.height };
+    pw.style.top = '24px'; pw.style.left = '0';
+    pw.style.width = '100vw'; pw.style.height = 'calc(100vh - 24px)';
     previewMaximised = true;
   } else {
     if (previewOrigRect) {
-      pw.style.top    = previewOrigRect.top;
-      pw.style.left   = previewOrigRect.left;
-      pw.style.width  = previewOrigRect.width;
-      pw.style.height = previewOrigRect.height;
+      pw.style.top = previewOrigRect.top; pw.style.left = previewOrigRect.left;
+      pw.style.width = previewOrigRect.width; pw.style.height = previewOrigRect.height;
     }
     previewMaximised = false;
   }
 }
 
-// ── Markdown to HTML (simple, no dependencies) ──────────────────────────────
 function markdownToHtml(md, title) {
   var html = escHtml(md)
-    // headings
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
     .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
-    // bold / italic
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g,     '<em>$1</em>')
     .replace(/__(.+?)__/g,     '<strong>$1</strong>')
     .replace(/_(.+?)_/g,       '<em>$1</em>')
-    // inline code
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // links
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    // horizontal rule
     .replace(/^---+$/gm, '<hr>')
-    // blockquote
     .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
-    // unordered list
-    .replace(/^\* (.+)$/gm,   '<li>$1</li>')
-    .replace(/^- (.+)$/gm,    '<li>$1</li>')
-    // ordered list
-    .replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
-    // line breaks → paragraphs (simple)
+    .replace(/^\* (.+)$/gm, '<li>$1</li>')
+    .replace(/^- (.+)$/gm,  '<li>$1</li>')
+    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
     .replace(/\n\n/g, '</p><p>');
-
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + title + '</title>'
-    + '<style>'
-    + 'body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}'
+    + '<style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}'
     + 'h1,h2,h3{margin-top:24px}code{background:#f0f0f0;padding:2px 5px;border-radius:3px;font-family:monospace}'
     + 'blockquote{border-left:4px solid #ccc;margin:0;padding-left:16px;color:#555}'
-    + 'hr{border:none;border-top:1px solid #ddd;margin:20px 0}'
-    + 'a{color:#0066cc}'
+    + 'hr{border:none;border-top:1px solid #ddd;margin:20px 0}a{color:#0066cc}'
     + '</style></head><body><p>' + html + '</p></body></html>';
 }
 
-// ── JS preview wrapper ──────────────────────────────────────────────────────
 function jsPreviewHtml(code, title) {
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + title + '</title>'
-    + '<style>'
-    + 'body{margin:0;font-family:monospace;font-size:13px;background:#1e1e2e;color:#cdd6f4;display:flex;flex-direction:column;height:100vh}'
+    + '<style>body{margin:0;font-family:monospace;font-size:13px;background:#1e1e2e;color:#cdd6f4;display:flex;flex-direction:column;height:100vh}'
     + '#output{flex:1;padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word}'
     + '.log{color:#a6e3a1}.err{color:#f38ba8}.warn{color:#f9e2af}.info{color:#89b4fa}'
     + '#header{padding:6px 12px;background:#181825;border-bottom:1px solid #313244;font-size:11px;color:#6c7086;flex-shrink:0}'
     + '</style></head><body>'
-    + '<div id="header">Console output — ' + escHtml(title) + '</div>'
+    + '<div id="header">Console output -- ' + escHtml(title) + '</div>'
     + '<div id="output"></div>'
-    + '<script>'
-    + '(function(){'
+    + '<script>(function(){'
     + 'var out=document.getElementById("output");'
     + 'function log(cls){return function(){var line=document.createElement("div");'
     + 'line.className=cls;line.textContent=Array.from(arguments).map(function(a){try{return typeof a==="object"?JSON.stringify(a,null,2):String(a)}catch(e){return String(a)}}).join(" ");'
     + 'out.appendChild(line);}}'
     + 'console.log=log("log");console.error=log("err");console.warn=log("warn");console.info=log("info");'
-    + 'window.onerror=function(m,s,l,c){log("err")(m+" (line "+l+")");}; '
+    + 'window.onerror=function(m,s,l){log("err")(m+" (line "+l+")")};'
     + 'try{' + code + '}catch(e){log("err")(e.toString());}'
-    + '}());'
-    + '<\/script></body></html>';
+    + '}());<\/script></body></html>';
 }
 
-// ── HTML escape helper ───────────────────────────────────────────────────────
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ── Preview window drag (mouse) ─────────────────────────────────────────── */
+/* ── Preview window drag ── */
 (function () {
-  var pw   = document.getElementById('preview-window');
-  var tb   = document.getElementById('preview-title-bar');
-  var rz   = document.getElementById('preview-resize');
-  var dragMode = null; // 'move' or 'resize'
-  var ox=0, oy=0, ow=0, oh=0, opx=0, opy=0;
+  var pw = document.getElementById('preview-window');
+  var tb = document.getElementById('preview-title-bar');
+  var rz = document.getElementById('preview-resize');
+  var dragMode = null, ox=0, oy=0, ow=0, oh=0, opx=0, opy=0;
 
   function startDrag(e, mode) {
-    dragMode = mode;
-    ox = e.clientX; oy = e.clientY;
+    dragMode = mode; ox = e.clientX; oy = e.clientY;
     opx = pw.offsetLeft; opy = pw.offsetTop;
-    ow  = pw.offsetWidth; oh = pw.offsetHeight;
-    document.body.style.userSelect = 'none';
-    e.preventDefault();
+    ow = pw.offsetWidth; oh = pw.offsetHeight;
+    document.body.style.userSelect = 'none'; e.preventDefault();
   }
 
-  tb.addEventListener('mousedown', function(e) {
-    if (e.target.classList.contains('win-btn')) return;
-    startDrag(e, 'move');
-  });
+  tb.addEventListener('mousedown', function(e) { if (e.target.classList.contains('win-btn')) return; startDrag(e, 'move'); });
   rz.addEventListener('mousedown', function(e) { startDrag(e, 'resize'); });
 
   document.addEventListener('mousemove', function(e) {
@@ -1104,12 +992,8 @@ function escHtml(s) {
       pw.style.height = Math.max(200, oh + dy) + 'px';
     }
   });
-  document.addEventListener('mouseup', function() {
-    dragMode = null;
-    document.body.style.userSelect = '';
-  });
+  document.addEventListener('mouseup', function() { dragMode = null; document.body.style.userSelect = ''; });
 
-  /* Touch drag for iPad */
   tb.addEventListener('touchstart', function(e) {
     if (e.target.classList.contains('win-btn')) return;
     ox = e.touches[0].clientX; oy = e.touches[0].clientY;
@@ -1118,23 +1002,121 @@ function escHtml(s) {
   }, { passive: false });
   document.addEventListener('touchmove', function(e) {
     if (!dragMode) return;
-    var dx = e.touches[0].clientX - ox, dy = e.touches[0].clientY - oy;
-    pw.style.left = Math.max(0, opx + dx) + 'px';
-    pw.style.top  = Math.max(24, opy + dy) + 'px';
+    pw.style.left = Math.max(0, opx + (e.touches[0].clientX - ox)) + 'px';
+    pw.style.top  = Math.max(24, opy + (e.touches[0].clientY - oy)) + 'px';
     e.preventDefault();
   }, { passive: false });
   document.addEventListener('touchend', function() { dragMode = null; });
 }());
 
-/* ── Preview keyboard shortcut ───────────────────────────────────────────── */
+/* ── Preview keyboard shortcut ── */
 document.addEventListener('keydown', function(e) {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-    e.preventDefault(); openPreview();
-  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); openPreview(); }
 });
 
-/* ── Wire preview button ─────────────────────────────────────────────────── */
+/* ── Preview button ── */
 document.getElementById('btn-preview').addEventListener('click', openPreview);
+
+/* ── EASTER EGG ──────────────────────────────────────────────────────────────
+   Type "i like cheese" in the Filter files box to trigger it.
+   Audio file: egg/i_like_cheese.mp3
+   ─────────────────────────────────────────────────────────────────────────── */
+(function () {
+  var SECRET = 'i like cheese';
+  var audio  = null;
+  var open   = false;
+
+  function showDialog() {
+    if (open) return;
+    open = true;
+
+    var overlay = document.createElement('div');
+    overlay.style.cssText = [
+      'position:fixed', 'inset:0', 'z-index:99999',
+      'background:rgba(0,0,0,0.5)',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      "font-family:'Chicago','Geneva',Arial,sans-serif"
+    ].join(';');
+
+    overlay.innerHTML =
+      '<div style="background:#c0c0c0;border:2px solid #000;' +
+        'box-shadow:3px 3px 0 #000,1px 1px 0 #fff inset,-1px -1px 0 #808080 inset;' +
+        'width:min(340px,90vw);display:flex;flex-direction:column;' +
+        'animation:cegg 0.15s ease;">' +
+
+        /* title bar */
+        '<div style="height:26px;' +
+          'background:repeating-linear-gradient(180deg,#d0d0d0 0px,#d0d0d0 1px,#a0a0a0 1px,#a0a0a0 2px);' +
+          'border-bottom:1px solid #000;display:flex;align-items:center;' +
+          'padding:0 4px;position:relative;user-select:none;">' +
+          '<div style="position:absolute;left:50%;transform:translateX(-50%);' +
+            'background:#c0c0c0;padding:1px 10px;font-weight:bold;font-size:12px;white-space:nowrap;">' +
+            'Secret Found' +
+          '</div>' +
+        '</div>' +
+
+        /* body */
+        '<div style="padding:20px 22px 16px;text-align:center;">' +
+          '<div style="font-size:48px;font-weight:bold;color:#c8a000;line-height:1;margin-bottom:10px;">[CHEESE]</div>' +
+          '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">You Like Cheese!</div>' +
+          '<div style="font-size:11px;color:#333;line-height:1.7;margin-bottom:16px;">' +
+            'Congratulations. You found the hidden easter egg.<br>' +
+            'A fine taste in dairy products.' +
+          '</div>' +
+
+          /* cheese meter */
+          '<div style="font-size:10px;color:#555;margin-bottom:4px;text-align:left;">Cheese Appreciation Level:</div>' +
+          '<div style="height:14px;background:#e0e0e0;border:1px solid #606060;' +
+            'box-shadow:1px 1px 0 #303030 inset;overflow:hidden;margin-bottom:16px;">' +
+            '<div id="cheesebar" style="height:100%;width:0%;' +
+              'background:repeating-linear-gradient(90deg,#c8a000 0px,#c8a000 6px,#e8c000 6px,#e8c000 10px);' +
+              'transition:width 1.2s ease;"></div>' +
+          '</div>' +
+
+          '<button id="cheesebtn" style="height:26px;padding:0 20px;border:1px solid #000;' +
+            'background:#000080;color:#fff;font-size:12px;font-family:inherit;' +
+            'font-weight:bold;cursor:pointer;' +
+            'box-shadow:1px 1px 0 #4040a0 inset,-1px -1px 0 #000040 inset;">' +
+            'OK -- I Do Like Cheese' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      '<style>@keyframes cegg{from{transform:scale(0.75);opacity:0}to{transform:scale(1);opacity:1}}</style>';
+
+    document.body.appendChild(overlay);
+
+    setTimeout(function () {
+      var bar = document.getElementById('cheesebar');
+      if (bar) bar.style.width = '100%';
+    }, 60);
+
+    function close() {
+      overlay.remove();
+      open = false;
+      if (audio) { audio.pause(); audio.currentTime = 0; }
+    }
+
+    document.getElementById('cheesebtn').addEventListener('click', close);
+    document.getElementById('cheesebtn').addEventListener('touchend', function(e) { e.preventDefault(); close(); }, { passive: false });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+  }
+
+  var box = document.getElementById('search-box');
+  box.addEventListener('input', function () {
+    if (box.value.trim().toLowerCase() !== SECRET) return;
+
+    try {
+      if (!audio) {
+        audio = new Audio('egg/i_like_cheese.mp3');
+        audio.volume = 0.85;
+      }
+      audio.currentTime = 0;
+      audio.play().catch(function () {});
+    } catch (e) {}
+
+    setTimeout(showDialog, 120);
+  });
+}());
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a01f3523ab2cd804',t:'MTc3OTgyMzk2NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a01f58977d11caf9',t:'MTc3OTgyNTQxNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
