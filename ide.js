@@ -1,17 +1,19 @@
 /* ======================================================
    Mac IDE 9 — ide.js
-   iPad + Safari compatible
+   iPad + Safari + Edge-on-iPad compatible
    ====================================================== */
 'use strict';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
-  rootHandle:  null,
-  tabs:        [],
-  activeTabId: null,
-  findMatches: [],
-  findIndex:   0,
-  ctxTarget:   null,
+  rootHandle:   null,
+  virtualTree:  null,   // {path: File} — used on Safari/iPad
+  virtualFolder: '',
+  tabs:         [],
+  activeTabId:  null,
+  findMatches:  [],
+  findIndex:    0,
+  ctxTarget:    null,
 };
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────
@@ -41,11 +43,21 @@ const dom = {
   titleText:       $('title-bar-text'),
 };
 
-// ── Feature detection ─────────────────────────────────────────────────────────
-const HAS_DIR_PICKER  = 'showDirectoryPicker' in window;
-const HAS_FILE_PICKER = 'showOpenFilePicker'  in window;
-const HAS_SAVE_PICKER = 'showSaveFilePicker'  in window;
-const IS_IPAD         = window.IS_IPAD || false;
+// ── Platform detection ────────────────────────────────────────────────────────
+// On ALL iOS/iPadOS devices (Safari, Chrome, Edge, Firefox) Apple forces WebKit.
+// showDirectoryPicker may exist in the JS namespace on Chromium-based iOS browsers
+// but is blocked at runtime by the sandbox. So we ALWAYS use the webkitdirectory
+// fallback on any iOS/iPadOS device.
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+// Feature flags — ignore dir/save pickers entirely on iOS
+const HAS_DIR_PICKER  = !IS_IOS && ('showDirectoryPicker' in window);
+const HAS_FILE_PICKER = !IS_IOS && ('showOpenFilePicker'  in window);
+const HAS_SAVE_PICKER = !IS_IOS && ('showSaveFilePicker'  in window);
+
+// Also expose for index.html
+window.IS_IPAD = IS_IOS;
 
 // ── Language map ──────────────────────────────────────────────────────────────
 const LANG_MAP = {
@@ -96,7 +108,7 @@ function isBinary(name) {
     'mp3','mp4','ogg','wav','flac','mov','avi'].includes(getExt(name));
 }
 
-// ── MIME type map (so Safari saves with the right extension) ──────────────────
+// MIME map so Safari/Edge-iPad saves with the right extension, not .txt
 function getMime(name) {
   const ext = getExt(name);
   const map = {
@@ -111,11 +123,11 @@ function getMime(name) {
     go:'text/x-go', c:'text/x-csrc', cpp:'text/x-c++src',
     java:'text/x-java', kt:'text/x-kotlin', cs:'text/x-csharp',
     php:'text/x-php', swift:'text/x-swift',
-    sh:'text/x-sh', bash:'text/x-sh', zsh:'text/x-sh', ps1:'text/plain',
+    sh:'text/x-sh', bash:'text/x-sh', zsh:'text/x-sh',
     sql:'text/x-sql', yaml:'text/yaml', yml:'text/yaml',
     toml:'text/toml', vue:'text/x-vue', svelte:'text/x-svelte',
     dart:'text/x-dart', lua:'text/x-lua', r:'text/x-r',
-    tf:'text/x-terraform', dockerfile:'text/plain',
+    tf:'text/plain', dockerfile:'text/plain',
     txt:'text/plain', env:'text/plain', ini:'text/plain',
     gitignore:'text/plain', lock:'text/plain',
   };
@@ -123,7 +135,7 @@ function getMime(name) {
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
-function toast(msg, type = 'info', duration = 3000) {
+function toast(msg, type = 'info', duration = 3500) {
   const t = el('div', `toast ${type}`);
   t.textContent = msg;
   dom.toastCont.appendChild(t);
@@ -139,47 +151,58 @@ let _uid = 0;
 const uid = () => ++_uid;
 
 // ── OPEN FOLDER ───────────────────────────────────────────────────────────────
-// Chrome/Edge: showDirectoryPicker
-// Safari/iPad: <input webkitdirectory> fallback — loads all files into memory
 async function openFolder() {
   if (HAS_DIR_PICKER) {
+    // Desktop Chrome / Edge — native directory picker
     try {
       const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-      state.rootHandle = handle;
+      state.rootHandle  = handle;
+      state.virtualTree = null;
       dom.folderName.textContent = handle.name.toUpperCase();
       dom.titleText.textContent  = 'Mac IDE -- ' + handle.name;
       await buildTree();
-      toast('Opened folder: ' + handle.name, 'success');
+      toast('Opened: ' + handle.name, 'success');
     } catch (e) {
       if (e.name !== 'AbortError') toast('Could not open folder: ' + e.message, 'error');
     }
     return;
   }
 
-  // ── Safari / iPad fallback: webkitdirectory input ──────────────────────────
+  // iOS / iPadOS (Safari, Chrome, Edge, Firefox) — webkitdirectory fallback
+  // This is the ONLY reliable method on all iOS browsers.
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.setAttribute('webkitdirectory', '');
+  inp.setAttribute('directory', '');        // Firefox alias
   inp.setAttribute('multiple', '');
 
   inp.onchange = async () => {
     const files = Array.from(inp.files);
-    if (!files.length) return;
+    if (!files.length) {
+      toast('No files selected.', 'info');
+      return;
+    }
 
-    // Derive folder name from the common path prefix
-    const firstPath = files[0].webkitRelativePath; // e.g. "myproject/src/index.js"
-    const folderName = firstPath.split('/')[0];
+    // webkitRelativePath = "FolderName/sub/file.js"
+    const firstRel   = files[0].webkitRelativePath || files[0].name;
+    const folderName = firstRel.includes('/') ? firstRel.split('/')[0] : 'Files';
 
-    // Build an in-memory virtual tree
-    state.rootHandle = null;
-    state.virtualTree = {};     // path -> File object
+    state.rootHandle   = null;
+    state.virtualTree  = {};
     state.virtualFolder = folderName;
+
+    const HIDDEN_NAMES = new Set(['.git','node_modules','.DS_Store','__pycache__',
+      '.next','.nuxt','dist','build','.cache','.turbo','.venv']);
 
     let loaded = 0;
     for (const file of files) {
+      const relPath = file.webkitRelativePath || file.name;
+      const parts   = relPath.split('/');
+
+      // Skip hidden directories anywhere in the path
+      if (parts.some(p => HIDDEN_NAMES.has(p))) continue;
       if (isBinary(file.name)) continue;
-      // webkitRelativePath is like "folder/sub/file.js"
-      const relPath = file.webkitRelativePath;
+
       state.virtualTree[relPath] = file;
       loaded++;
     }
@@ -187,24 +210,32 @@ async function openFolder() {
     dom.folderName.textContent = folderName.toUpperCase();
     dom.titleText.textContent  = 'Mac IDE -- ' + folderName;
     buildVirtualTree();
-    toast(`Opened folder: ${folderName} (${loaded} files)`, 'success');
+    toast(`Opened "${folderName}" — ${loaded} files loaded`, 'success');
   };
 
+  // Must be appended to DOM and clicked — some iOS browsers block detached inputs
+  inp.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:0;left:0;';
+  document.body.appendChild(inp);
   inp.click();
+  setTimeout(() => inp.remove(), 5000);
 }
 
-// ── Build virtual tree (Safari fallback) ──────────────────────────────────────
+// ── Virtual tree (iOS fallback) ───────────────────────────────────────────────
 function buildVirtualTree(filter = '') {
   dom.fileTree.innerHTML = '';
   if (!state.virtualTree) return;
 
-  const fl = filter.toLowerCase();
-  // Collect all paths
+  const fl    = filter.toLowerCase();
   const paths = Object.keys(state.virtualTree).filter(p =>
     !fl || p.toLowerCase().includes(fl)
   );
 
-  // Build a nested structure
+  if (paths.length === 0) {
+    dom.fileTree.innerHTML = '<div class="tree-empty">No matching files.</div>';
+    return;
+  }
+
+  // Build nested object: { folderName: { subDir: { file: fullPath } } }
   const root = {};
   for (const p of paths) {
     const parts = p.split('/');
@@ -212,78 +243,85 @@ function buildVirtualTree(filter = '') {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       if (i === parts.length - 1) {
-        node[part] = p; // leaf = full path string
+        node[part] = p;               // leaf = path string
       } else {
-        node[part] = node[part] || {};
+        if (typeof node[part] !== 'object') node[part] = {};
+        node = node[part];
       }
-      node = node[part];
     }
   }
 
   const frag = document.createDocumentFragment();
-  renderVirtualNode(root[state.virtualFolder] || root, frag, 0);
+  // Start one level in (skip the root folder itself, show its children)
+  const startNode = root[state.virtualFolder] || root;
+  renderVirtualNode(startNode, frag, 0);
   dom.fileTree.appendChild(frag);
 }
 
 function renderVirtualNode(node, container, depth) {
   const entries = Object.entries(node).sort((a, b) => {
-    const aIsDir = typeof a[1] === 'object';
-    const bIsDir = typeof b[1] === 'object';
-    if (aIsDir !== bIsDir) return aIsDir ? -1 : 1;
+    const aDir = typeof a[1] === 'object';
+    const bDir = typeof b[1] === 'object';
+    if (aDir !== bDir) return aDir ? -1 : 1;
     return a[0].localeCompare(b[0]);
   });
 
   for (const [name, value] of entries) {
     if (typeof value === 'object') {
-      // folder
-      const folderEl = el('div', 'tree-item tree-folder');
+      // Directory
+      const folderEl   = el('div', 'tree-item tree-folder');
+      const childrenEl = el('div', 'tree-children');
       folderEl.style.paddingLeft = (8 + depth * 14) + 'px';
       folderEl.innerHTML =
         `<span class="arrow">v</span>` +
         `<span class="icon">[dir]</span>` +
         `<span class="name">${name}</span>`;
 
-      const childrenEl = el('div', 'tree-children');
+      renderVirtualNode(value, childrenEl, depth + 1);
 
       const toggle = (e) => {
         e.stopPropagation();
+        if (e.cancelable) e.preventDefault();
         const open = childrenEl.style.display === 'none';
         childrenEl.style.display = open ? '' : 'none';
         folderEl.querySelector('.arrow').textContent = open ? 'v' : '>';
       };
 
-      folderEl.addEventListener('click', toggle);
-      folderEl.addEventListener('touchend', e => { e.preventDefault(); toggle(e); }, { passive: false });
+      folderEl.addEventListener('click',    toggle);
+      folderEl.addEventListener('touchend', toggle, { passive: false });
 
-      renderVirtualNode(value, childrenEl, depth + 1);
       container.appendChild(folderEl);
       container.appendChild(childrenEl);
 
     } else {
-      // file — value is the full path string
-      const path = value;
+      // File
+      const path   = value;
       const fileEl = el('div', 'tree-item');
       fileEl.style.paddingLeft = (8 + depth * 14 + 16) + 'px';
       fileEl.innerHTML =
         `<span class="icon">${getIcon(name)}</span>` +
         `<span class="name">${name}</span>`;
-      fileEl.title = path;
+      fileEl.title        = path;
       fileEl.dataset.path = path;
 
-      const open = async (e) => {
-        if (e.type === 'touchend') e.preventDefault();
+      const openFile = async (e) => {
+        if (e.cancelable) e.preventDefault();
         const file = state.virtualTree[path];
         if (!file) return;
-        const text = await file.text();
-        // Check if already open
+        // Already open?
         const existing = state.tabs.find(t => t.path === path);
         if (existing) { setActiveTab(existing.id); return; }
-        openTabFromContent(name, path, null, text);
-        highlightTree(path);
+        try {
+          const text = await file.text();
+          openTabFromContent(name, path, null, text);
+          highlightTree(path);
+        } catch (err) {
+          toast('Could not read file: ' + err.message, 'error');
+        }
       };
 
-      fileEl.addEventListener('click', open);
-      fileEl.addEventListener('touchend', open, { passive: false });
+      fileEl.addEventListener('click',    openFile);
+      fileEl.addEventListener('touchend', openFile, { passive: false });
       container.appendChild(fileEl);
     }
   }
@@ -301,18 +339,28 @@ async function openFiles() {
     return;
   }
 
-  // Safari fallback
+  // iOS fallback
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.multiple = true;
+  inp.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:0;left:0;';
+  document.body.appendChild(inp);
+
   inp.onchange = async () => {
     for (const file of inp.files) {
       if (isBinary(file.name)) { toast('Skipped binary: ' + file.name, 'info'); continue; }
-      const text = await file.text();
-      openTabFromContent(file.name, file.name, null, text);
+      try {
+        const text = await file.text();
+        openTabFromContent(file.name, file.name, null, text);
+      } catch (e) {
+        toast('Could not read: ' + file.name, 'error');
+      }
     }
+    inp.remove();
   };
+
   inp.click();
+  setTimeout(() => inp.remove(), 5000);
 }
 
 async function openFileHandle(handle, path) {
@@ -336,7 +384,7 @@ function openTabFromContent(name, path, handle, content) {
 async function saveTab(tab) {
   if (!tab) return;
 
-  // 1. Has a FileSystem handle (Chrome/Edge after open) → write directly
+  // Desktop Chrome/Edge with existing handle
   if (tab.handle && HAS_SAVE_PICKER) {
     try {
       const w = await tab.handle.createWritable();
@@ -352,7 +400,7 @@ async function saveTab(tab) {
     }
   }
 
-  // 2. showSaveFilePicker available (Chrome/Edge, no existing handle)
+  // Desktop Chrome/Edge, no handle yet
   if (HAS_SAVE_PICKER) {
     try {
       tab.handle = await window.showSaveFilePicker({ suggestedName: tab.name });
@@ -369,21 +417,22 @@ async function saveTab(tab) {
     }
   }
 
-  // 3. Safari / iPad fallback: download with correct filename AND mime type
-  //    Using a Blob with the right MIME ensures Safari names it correctly.
+  // iOS / Safari / Edge-iPad: download with correct MIME + filename
+  // The Blob MIME type is the key — it tells iOS what extension to use
   const mime = getMime(tab.name);
   const blob = new Blob([tab.content], { type: mime });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = tab.name;   // ← exact filename with extension, NOT .txt
+  a.download = tab.name;  // exact filename, e.g. "index.html" not "index.txt"
+  a.style.cssText = 'position:fixed;opacity:0;pointer-events:none;top:0;left:0;';
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
 
   tab.savedContent = tab.content;
   renderTabs();
-  toast('Downloaded: ' + tab.name, 'success');
+  toast(`Downloaded: ${tab.name}`, 'success');
 }
 
 async function saveAllTabs() {
@@ -392,7 +441,7 @@ async function saveAllTabs() {
   for (const tab of unsaved) await saveTab(tab);
 }
 
-// ── File tree (Chrome/Edge with dir handle) ───────────────────────────────────
+// ── Build tree (desktop with dir handle) ─────────────────────────────────────
 const treeState = {};
 const HIDDEN = new Set(['.git','node_modules','.DS_Store','__pycache__','.next',
   '.nuxt','dist','build','.cache','.turbo','.venv']);
@@ -435,7 +484,7 @@ async function renderDir(dirHandle, container, pathPrefix, depth, filter) {
 
       const toggle = async (e) => {
         e.stopPropagation();
-        if (e.type === 'touchend') e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         const open = childrenEl.style.display === 'none';
         treeState[fullPath] = open;
         childrenEl.style.display = open ? '' : 'none';
@@ -444,7 +493,7 @@ async function renderDir(dirHandle, container, pathPrefix, depth, filter) {
           await renderDir(handle, childrenEl, fullPath, depth + 1, filter);
       };
 
-      folderEl.addEventListener('click', toggle);
+      folderEl.addEventListener('click',    toggle);
       folderEl.addEventListener('touchend', toggle, { passive: false });
       folderEl.addEventListener('contextmenu', e => showCtx(e, { kind: 'directory', name, path: fullPath, handle }));
 
@@ -459,16 +508,16 @@ async function renderDir(dirHandle, container, pathPrefix, depth, filter) {
       fileEl.innerHTML =
         `<span class="icon">${getIcon(name)}</span>` +
         `<span class="name">${name}</span>`;
-      fileEl.title = fullPath;
+      fileEl.title        = fullPath;
       fileEl.dataset.path = fullPath;
 
       const open = async (e) => {
-        if (e.type === 'touchend') e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         await openFileHandle(handle, fullPath);
         highlightTree(fullPath);
       };
 
-      fileEl.addEventListener('click', open);
+      fileEl.addEventListener('click',    open);
       fileEl.addEventListener('touchend', open, { passive: false });
       fileEl.addEventListener('contextmenu', e => showCtx(e, { kind: 'file', name, path: fullPath, handle }));
       container.appendChild(fileEl);
@@ -516,7 +565,7 @@ function setActiveTab(id) {
   state.activeTabId = id;
   const tab = state.tabs.find(t => t.id === id);
   if (!tab) { showWelcome(); return; }
-  dom.welcome.style.display    = 'none';
+  dom.welcome.style.display         = 'none';
   dom.editorContainer.style.display = 'flex';
   dom.editor.value = tab.content;
   dom.titleText.textContent = 'Mac IDE -- ' + tab.name;
@@ -524,7 +573,7 @@ function setActiveTab(id) {
   updateStatusBar(tab);
   highlightTree(tab.path);
   renderTabs();
-  if (!IS_IPAD) dom.editor.focus();
+  if (!IS_IOS) dom.editor.focus();
 }
 
 function closeTab(id) {
@@ -544,7 +593,7 @@ function closeTab(id) {
 }
 
 function showWelcome() {
-  dom.welcome.style.display    = 'flex';
+  dom.welcome.style.display         = 'flex';
   dom.editorContainer.style.display = 'none';
   dom.stFile.textContent = 'No file open';
   dom.stLang.textContent = 'Plain Text';
@@ -553,7 +602,7 @@ function showWelcome() {
   dom.titleText.textContent = 'Mac IDE -- Untitled';
 }
 
-// ── Editor ────────────────────────────────────────────────────────────────────
+// ── Editor events ─────────────────────────────────────────────────────────────
 dom.editor.addEventListener('input', () => {
   const tab = activeTab();
   if (!tab) return;
@@ -562,14 +611,14 @@ dom.editor.addEventListener('input', () => {
   updateStatusBar(tab);
   const t = dom.tabBar.querySelector(`.tab[data-id="${tab.id}"]`);
   if (t) {
-    const nameEl = t.querySelector('.tab-name');
-    if (nameEl) nameEl.textContent = (tab.content !== tab.savedContent ? '* ' : '') + tab.name;
+    const nm = t.querySelector('.tab-name');
+    if (nm) nm.textContent = (tab.content !== tab.savedContent ? '* ' : '') + tab.name;
   }
 });
 
 dom.editor.addEventListener('keydown', e => {
   const ctrl = e.ctrlKey || e.metaKey;
-  if (ctrl) return; // let global handler deal with Ctrl/Cmd combos
+  if (ctrl) return;
 
   if (e.key === 'Tab') {
     e.preventDefault();
@@ -605,9 +654,9 @@ dom.editor.addEventListener('keydown', e => {
   }
 });
 
-dom.editor.addEventListener('scroll',  () => { dom.lineNumbers.scrollTop = dom.editor.scrollTop; });
-dom.editor.addEventListener('click',   updateCaret);
-dom.editor.addEventListener('keyup',   updateCaret);
+dom.editor.addEventListener('scroll',   () => { dom.lineNumbers.scrollTop = dom.editor.scrollTop; });
+dom.editor.addEventListener('click',    updateCaret);
+dom.editor.addEventListener('keyup',    updateCaret);
 dom.editor.addEventListener('touchend', updateCaret, { passive: true });
 
 function insertAt(start, end, text) {
@@ -652,12 +701,10 @@ function openFind() {
   dom.findInput.select();
   doFind();
 }
-
 function closeFind() {
   dom.findBar.classList.remove('open');
-  if (!IS_IPAD) dom.editor.focus();
+  if (!IS_IOS) dom.editor.focus();
 }
-
 function doFind() {
   const q = dom.findInput.value;
   state.findMatches = []; state.findIndex = 0;
@@ -670,7 +717,6 @@ function doFind() {
     : 'Not found';
   if (state.findMatches.length) jumpToMatch(0);
 }
-
 function jumpToMatch(idx) {
   if (!state.findMatches.length) return;
   state.findIndex = (idx + state.findMatches.length) % state.findMatches.length;
@@ -682,7 +728,6 @@ function jumpToMatch(idx) {
   const lineIdx = dom.editor.value.slice(0, pos).split('\n').length - 1;
   dom.editor.scrollTop = lineIdx * 22 - dom.editor.clientHeight / 2;
 }
-
 function doReplace() {
   if (!state.findMatches.length) return;
   const pos = state.findMatches[state.findIndex];
@@ -692,18 +737,15 @@ function doReplace() {
   if (tab) tab.content = dom.editor.value;
   doFind();
 }
-
 function doReplaceAll() {
   const q = dom.findInput.value; if (!q) return;
-  const rep = dom.replaceInput.value;
-  dom.editor.value = dom.editor.value.split(q).join(rep);
+  dom.editor.value = dom.editor.value.split(q).join(dom.replaceInput.value);
   const tab = activeTab();
   if (tab) tab.content = dom.editor.value;
   dom.editor.dispatchEvent(new Event('input'));
   doFind();
   toast(`Replaced all "${q}"`, 'success');
 }
-
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 dom.findInput.addEventListener('input', doFind);
@@ -727,10 +769,8 @@ function showCtx(e, data) {
   $('ctx-open').style.display      = data.kind !== 'tab' ? '' : 'none';
   $('ctx-close-tab').style.display = data.kind === 'tab' ? '' : 'none';
 }
-
 document.addEventListener('click',    () => dom.ctxMenu.classList.remove('open'));
 document.addEventListener('touchend', () => dom.ctxMenu.classList.remove('open'), { passive: true });
-
 $('ctx-open').onclick      = async () => {
   if (state.ctxTarget?.kind === 'file')
     await openFileHandle(state.ctxTarget.handle, state.ctxTarget.path);
@@ -740,13 +780,11 @@ $('ctx-close-tab').onclick = () => {
 };
 $('ctx-rename').onclick    = () => toast('Rename is not supported by the File System API.', 'info');
 
-// ── Sidebar resize (mouse) ────────────────────────────────────────────────────
+// ── Sidebar resize — mouse ────────────────────────────────────────────────────
 const resizer = $('resizer');
 let resizing = false, startX = 0, startW = 0;
-
 resizer.addEventListener('mousedown', e => {
-  resizing = true; startX = e.clientX;
-  startW = $('sidebar').offsetWidth;
+  resizing = true; startX = e.clientX; startW = $('sidebar').offsetWidth;
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
 });
@@ -761,21 +799,16 @@ document.addEventListener('mouseup', () => {
   document.body.style.userSelect = '';
 });
 
-// ── Sidebar resize (touch) ────────────────────────────────────────────────────
+// ── Sidebar resize — touch ────────────────────────────────────────────────────
 resizer.addEventListener('touchstart', e => {
-  resizing = true;
-  startX = e.touches[0].clientX;
-  startW = $('sidebar').offsetWidth;
+  resizing = true; startX = e.touches[0].clientX; startW = $('sidebar').offsetWidth;
   e.preventDefault();
 }, { passive: false });
-
 document.addEventListener('touchmove', e => {
   if (!resizing) return;
-  const w = Math.max(100, Math.min(400, startW + e.touches[0].clientX - startX));
-  $('sidebar').style.width = w + 'px';
+  $('sidebar').style.width = Math.max(100, Math.min(400, startW + e.touches[0].clientX - startX)) + 'px';
   e.preventDefault();
 }, { passive: false });
-
 document.addEventListener('touchend', () => { resizing = false; }, { passive: true });
 
 // ── File filter ───────────────────────────────────────────────────────────────
@@ -797,16 +830,13 @@ $('btn-toggle-sidebar').onclick = () => $('sidebar').classList.toggle('collapsed
 document.addEventListener('keydown', async e => {
   const ctrl = e.ctrlKey || e.metaKey;
   if (!ctrl) return;
-
   switch (e.key) {
     case 'o': case 'O':
       e.preventDefault();
-      if (e.shiftKey) openFolder(); else openFiles();
-      break;
+      e.shiftKey ? openFolder() : openFiles(); break;
     case 's': case 'S':
       e.preventDefault();
-      if (e.shiftKey) await saveAllTabs(); else await saveTab(activeTab());
-      break;
+      e.shiftKey ? await saveAllTabs() : await saveTab(activeTab()); break;
     case 'f':
       e.preventDefault(); openFind(); break;
     case 'w':
@@ -820,8 +850,7 @@ document.addEventListener('keydown', async e => {
       if (!state.tabs.length) break;
       const idx  = state.tabs.findIndex(t => t.id === state.activeTabId);
       const next = state.tabs[(idx + 1) % state.tabs.length];
-      if (next) setActiveTab(next.id);
-      break;
+      if (next) setActiveTab(next.id); break;
     case '=': case '+':
       e.preventDefault(); changeFontSize(1);  break;
     case '-':
@@ -829,7 +858,7 @@ document.addEventListener('keydown', async e => {
   }
 });
 
-// ── Pinch-to-zoom on editor (iPad) ───────────────────────────────────────────
+// ── Pinch-to-zoom on editor ───────────────────────────────────────────────────
 (function () {
   let lastDist = 0;
   dom.editor.addEventListener('touchstart', e => {
@@ -839,18 +868,15 @@ document.addEventListener('keydown', async e => {
       lastDist = Math.hypot(dx, dy);
     }
   }, { passive: true });
-
   dom.editor.addEventListener('touchmove', e => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      const dx   = e.touches[0].clientX - e.touches[1].clientX;
-      const dy   = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.hypot(dx, dy);
-      if (lastDist > 0) changeFontSize(dist > lastDist ? 1 : -1);
-      lastDist = dist;
-    }
+    if (e.touches.length !== 2) return;
+    e.preventDefault();
+    const dx   = e.touches[0].clientX - e.touches[1].clientX;
+    const dy   = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    if (lastDist > 0) changeFontSize(dist > lastDist ? 1 : -1);
+    lastDist = dist;
   }, { passive: false });
-
   dom.editor.addEventListener('touchend', () => { lastDist = 0; }, { passive: true });
 }());
 
@@ -862,14 +888,14 @@ window.addEventListener('beforeunload', e => {
   }
 });
 
-// ── Safari/iPad notice ────────────────────────────────────────────────────────
-if (!HAS_DIR_PICKER || !HAS_SAVE_PICKER) {
+// ── Info banner ───────────────────────────────────────────────────────────────
+if (IS_IOS) {
   const note = document.createElement('div');
   note.style.cssText =
-    'background:#fffbcc;color:#000;padding:3px 10px;font-size:10px;' +
+    'background:#fffbcc;color:#000;padding:4px 10px;font-size:11px;' +
     'text-align:center;border-bottom:1px solid #888;font-family:Geneva,Arial,sans-serif;flex-shrink:0;';
-  note.textContent = IS_IPAD
-    ? 'iPad / Safari: Use "Open Folder" to load files. "Save" will download with the correct filename.'
-    : 'This browser has limited file system support. Files will be downloaded on save.';
+  note.textContent =
+    'iPad mode: Tap "Open Folder" to select a folder. ' +
+    'Tap "Save" to download files with the correct filename.';
   $('ide-window').insertBefore(note, $('toolbar'));
 }
