@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- iPad: allow full viewport, prevent zoom on input focus -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <title>Mac IDE</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --mac-bg:        #c0c0c0;
+      --mac-dark:      #808080;
+      --mac-black:     #000000;
+      --mac-white:     #ffffff;
+      --mac-highlight: #000080;
+      --font-system:   'Chicago', 'Charcoal', 'Geneva', 'Arial', sans-serif;
+      --font-mono:     'Courier New', 'Courier', monospace;
+      /* iPad touch target minimum */
+      --touch-min:     36px;
+    }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      background: var(--mac-bg);
+      color: var(--mac-black);
+      font-family: var(--font-system);
+      font-size: 12px;
+      /* Prevent callout / selection on UI chrome */
+      -webkit-user-select: none;
+      user-select: none;
+      /* Prevent iOS bounce scroll */
+      overscroll-behavior: none;
+      touch-action: none;
+    }
+
+    /* ── BOOT SCREEN ── */
+    #boot-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      background: #aaaaaa;
+    }
+
+    #boot-card {
+      background: #fff;
+      border: 1px solid #606060;
+      box-shadow: 2px 2px 0 #606060, 3px 3px 0 #303030;
+      width: min(460px, 90vw);
+      padding: 28px 32px 24px 28px;
+      display: flex; flex-direction: column;
+    }
+
+    #boot-top {
+      display: flex; align-items: center;
+      gap: 22px; padding-bottom: 16px;
+      border-bottom: 1px solid #888;
+    }
+
+    #boot-apple-svg { width: 68px; height: 83px; flex-shrink: 0; }
+
+    #boot-text-block {
+      display: flex; flex-direction: column;
+      justify-content: center; line-height: 1;
+    }
+
+    #boot-name {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 36px; font-weight: bold; font-style: italic;
+      color: #000; letter-spacing: -0.5px;
+    }
+
+    #boot-num {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 72px; font-weight: bold; color: #000;
+      line-height: 0.9; letter-spacing: -3px; margin-top: -2px;
+    }
+
+    #boot-bottom {
+      padding-top: 14px; display: flex;
+      flex-direction: column; gap: 9px;
+    }
+
+    #boot-starting-up {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 14px; font-style: italic; color: #000;
+    }
+
+    #boot-progress-track {
+      width: 100%; height: 12px;
+      background: #d0d0d0; border: 1px solid #606060;
+      box-shadow: 1px 1px 0 #303030 inset; overflow: hidden;
+    }
+
+    #boot-progress-fill {
+      height: 100%; width: 0%;
+      background: repeating-linear-gradient(
+        90deg,
+        #000090 0px, #000090 5px,
+        #4444bb 5px, #4444bb 8px,
+        #000090 8px, #000090 12px
+      );
+      transition: width 0.08s linear;
+    }
+
+    #boot-screen.fading { animation: bootFade 0.55s ease forwards; }
+    @keyframes bootFade { to { opacity: 0; } }
+
+    /* ── APP ── */
+    #app { display: none; flex-direction: column; height: 100vh; touch-action: none; }
+
+    #desktop {
+      position: fixed; inset: 0; background: #007777;
+      background-image: repeating-linear-gradient(
+        45deg, transparent, transparent 2px,
+        rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px
+      );
+      z-index: 0; pointer-events: none;
+    }
+
+    /* ── Menu bar ── */
+    #menubar {
+      height: 24px;
+      background: linear-gradient(180deg, #e8e8e8 0%, #c8c8c8 100%);
+      border-bottom: 1px solid #000;
+      display: flex; align-items: center;
+      position: relative; z-index: 100; flex-shrink: 0;
+    }
+    #menubar-left { display: flex; align-items: stretch; height: 100%; }
+    #apple-menu {
+      width: 32px; display: flex; align-items: center; justify-content: center;
+      font-size: 14px; cursor: pointer; border-right: 1px solid rgba(0,0,0,0.1);
+    }
+    #apple-menu:hover, #apple-menu:active { background: var(--mac-highlight); color: #fff; }
+    .menu-item {
+      padding: 0 10px; font-size: 12px; font-weight: bold;
+      cursor: pointer; display: flex; align-items: center;
+      font-family: var(--font-system); height: 100%;
+      min-height: var(--touch-min);
+    }
+    .menu-item:hover, .menu-item:active { background: var(--mac-highlight); color: #fff; }
+    #menubar-right {
+      margin-left: auto; display: flex; align-items: center;
+      gap: 8px; padding-right: 8px; font-size: 11px;
+    }
+    /* iPad badge in menubar */
+    #ipad-badge {
+      display: none;
+      font-size: 10px; background: #000080; color: #fff;
+      padding: 1px 5px; border: 1px solid #000;
+    }
+
+    .menu-wrap { position: relative; display: flex; align-items: stretch; }
+    .menu-wrap.active > .menu-item { background: var(--mac-highlight); color: #fff; }
+
+    .dropdown {
+      position: absolute; top: 24px; left: 0;
+      background: var(--mac-bg); border: 1px solid #000;
+      padding: 2px 0; z-index: 500; min-width: 180px;
+      display: none; box-shadow: 2px 2px 0 #000;
+    }
+    .dropdown.open { display: block; }
+    .dropdown-item {
+      padding: 6px 20px 6px 18px; font-size: 12px;
+      font-family: var(--font-system); cursor: default;
+      display: flex; justify-content: space-between; gap: 20px; white-space: nowrap;
+      min-height: var(--touch-min); align-items: center;
+    }
+    .dropdown-item:hover, .dropdown-item:active { background: var(--mac-highlight); color: #fff; }
+    .dropdown-sep { height: 1px; background: var(--mac-dark); margin: 3px 4px; }
+    .dropdown-item .shortcut { font-size: 10px; opacity: 0.7; }
+
+    /* ── IDE Window ── */
+    #ide-window {
+      position: absolute; top: 24px; left: 0; right: 0; bottom: 0;
+      display: flex; flex-direction: column; z-index: 10;
+      background: var(--mac-bg); border: 1px solid #000;
+      box-shadow: 1px 1px 0 #fff inset, -1px -1px 0 #808080 inset;
+    }
+
+    #title-bar {
+      height: 26px; border-bottom: 1px solid #000;
+      display: flex; align-items: center; padding: 0 4px; gap: 4px;
+      flex-shrink: 0; cursor: move; position: relative;
+      background: repeating-linear-gradient(
+        180deg, #d0d0d0 0px, #d0d0d0 1px, #a0a0a0 1px, #a0a0a0 2px
+      );
+    }
+    #title-bar-text {
+      position: absolute; left: 50%; transform: translateX(-50%);
+      font-size: 12px; font-weight: bold; background: var(--mac-bg);
+      padding: 1px 8px; white-space: nowrap; font-family: var(--font-system);
+    }
+    .win-btn {
+      width: 16px; height: 16px; border: 1px solid #000;
+      background: var(--mac-bg); cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 9px;
+      box-shadow: 1px 1px 0 #fff inset, -1px -1px 0 #606060 inset; z-index: 1;
+    }
+    .win-btn:hover, .win-btn:active { background: #aaa; }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      height: var(--touch-min);
+      background: var(--mac-bg); border-bottom: 1px solid #000;
+      display: flex; align-items: center; padding: 0 6px; gap: 4px;
+      flex-shrink: 0; box-shadow: 0 1px 0 #fff;
+      overflow-x: auto; overflow-y: hidden;
+    }
+    #toolbar::-webkit-scrollbar { height: 0; }
+
+    .mac-btn {
+      height: 26px; padding: 0 10px; border: 1px solid #000;
+      background: var(--mac-bg); cursor: pointer;
+      font-size: 11px; font-family: var(--font-system); font-weight: bold; color: #000;
+      display: flex; align-items: center; gap: 4px; white-space: nowrap;
+      box-shadow: 1px 1px 0 #fff inset, -1px -1px 0 #808080 inset;
+      /* iPad: ensure tap target */
+      min-height: 26px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mac-btn:hover, .mac-btn:active {
+      background: #d0d0d0;
+      box-shadow: 1px 1px 0 #808080 inset, -1px -1px 0 #fff inset;
+    }
+    .mac-btn.primary {
+      background: #000080; color: #fff;
+      box-shadow: 1px 1px 0 #4040a0 inset, -1px -1px 0 #000040 inset;
+    }
+    .mac-btn.primary:hover, .mac-btn.primary:active { background: #0000a0; }
+
+    #toolbar .sep { width: 1px; height: 20px; background: #808080; box-shadow: 1px 0 0 #fff; margin: 0 2px; flex-shrink: 0; }
+    #toolbar .spacer { flex: 1; min-width: 8px; }
+    #search-box {
+      height: 22px; padding: 0 6px; border: 1px solid #000;
+      background: #fff; font-size: 11px; font-family: var(--font-system);
+      width: 130px; outline: none; box-shadow: 1px 1px 0 #808080 inset;
+      /* allow text selection in inputs */
+      -webkit-user-select: text; user-select: text;
+    }
+
+    /* ── Main ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 200px; min-width: 100px; background: var(--mac-bg);
+      border-right: 1px solid #000; display: flex; flex-direction: column;
+      overflow: hidden; flex-shrink: 0;
+      box-shadow: 1px 0 0 #fff inset; transition: width 0.15s;
+    }
+    #sidebar.collapsed { width: 0 !important; border-right: none; }
+
+    /* iPad: wider sidebar by default */
+    body.is-ipad #sidebar { width: 220px; }
+
+    #sidebar-header {
+      height: 22px; background: var(--mac-highlight); color: #fff;
+      font-size: 11px; font-weight: bold; padding: 0 6px;
+      display: flex; align-items: center; font-family: var(--font-system); flex-shrink: 0;
+    }
+    #file-tree {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      background: #fff; border-top: 1px solid #808080;
+      /* smooth momentum scroll on iPad */
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+    }
+    #file-tree::-webkit-scrollbar { width: 8px; }
+    #file-tree::-webkit-scrollbar-track { background: #c0c0c0; }
+    #file-tree::-webkit-scrollbar-thumb { background: #808080; }
+
+    .tree-item {
+      display: flex; align-items: center;
+      /* taller rows on iPad for easier tapping */
+      padding: 2px 4px; min-height: 28px;
+      cursor: default; gap: 4px; font-size: 12px; font-family: var(--font-system);
+      white-space: nowrap; overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tree-item:hover, .tree-item:active { background: #d0dce8; }
+    .tree-item.active { background: var(--mac-highlight); color: #fff; }
+    .tree-item .icon { font-size: 12px; flex-shrink: 0; }
+    .tree-item .name { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .tree-folder { font-weight: bold; }
+    .tree-folder .arrow { font-size: 10px; width: 12px; flex-shrink: 0; }
+    .tree-empty { padding: 16px 10px; text-align: center; color: #808080; font-size: 11px; line-height: 1.9; }
+
+    /* ── Resizer ── */
+    #resizer {
+      width: 8px; background: var(--mac-bg); cursor: col-resize; flex-shrink: 0;
+      border-left: 1px solid #808080; border-right: 1px solid #fff;
+      touch-action: none;
+    }
+
+    /* ── Editor area ── */
+    #editor-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Tab bar ── */
+    #tab-bar {
+      min-height: 28px; background: var(--mac-bg); border-bottom: 1px solid #000;
+      display: flex; align-items: flex-end; overflow-x: auto; overflow-y: hidden;
+      flex-shrink: 0; padding: 2px 2px 0; gap: 2px;
+      -webkit-overflow-scrolling: touch;
+    }
+    #tab-bar::-webkit-scrollbar { height: 0; }
+    .tab {
+      display: flex; align-items: center; gap: 4px;
+      padding: 3px 12px 3px 10px; border: 1px solid #000; border-bottom: none;
+      cursor: pointer; white-space: nowrap; font-size: 11px; font-family: var(--font-system);
+      background: #b0b0b0; min-width: 90px; max-width: 180px;
+      box-shadow: 1px 0 0 #fff inset, 0 1px 0 #fff inset;
+      margin-bottom: -1px; position: relative;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab.active { background: #fff; z-index: 2; }
+    .tab:hover:not(.active), .tab:active:not(.active) { background: #c8c8c8; }
+    .tab .tab-name { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .tab .tab-close {
+      font-size: 10px; opacity: 0.5; width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center; border: 1px solid transparent;
+    }
+    .tab.active .tab-close { opacity: 1; }
+    .tab .tab-close:hover, .tab .tab-close:active { border-color: #000; background: #c0c0c0; }
+
+    /* ── Editor wrapper ── */
+    #editor-wrapper {
+      flex: 1; overflow: hidden; display: flex; position: relative;
+      background: #fff; border: 2px solid #000; border-top: 1px solid #808080;
+      box-shadow: 1px 1px 0 #808080 inset;
+    }
+    #editor-container { flex: 1; display: flex; overflow: hidden; }
+    #line-numbers {
+      width: 44px; background: #f0f0f0; color: #808080;
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+      text-align: right; padding: 6px 4px 6px 0;
+      overflow: hidden; user-select: none; flex-shrink: 0;
+      border-right: 1px solid #808080;
+    }
+
+    #editor {
+      flex: 1; resize: none; background: #fff; color: #000;
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+      padding: 6px 10px; border: none; outline: none;
+      overflow-y: auto; overflow-x: auto; white-space: pre; tab-size: 4;
+      caret-color: #000;
+      /* allow text selection + typing */
+      -webkit-user-select: text; user-select: text;
+      touch-action: pan-x pan-y;
+      -webkit-overflow-scrolling: touch;
+      /* prevent iOS from auto-correcting code */
+      autocorrect: off; autocapitalize: none; spellcheck: false;
+    }
+    #editor::selection { background: #000080; color: #fff; }
+    #editor::-webkit-scrollbar { width: 8px; height: 8px; }
+    #editor::-webkit-scrollbar-track { background: #c0c0c0; }
+    #editor::-webkit-scrollbar-thumb { background: #808080; }
+    #editor::-webkit-scrollbar-corner { background: #c0c0c0; }
+
+    /* ── Status bar ── */
+    #statusbar {
+      height: 20px; background: var(--mac-bg); border-top: 1px solid #000;
+      display: flex; align-items: center; padding: 0 8px;
+      font-size: 10px; font-family: var(--font-system); gap: 10px; flex-shrink: 0;
+      box-shadow: 0 -1px 0 #fff; overflow: hidden;
+    }
+    #statusbar .sep { width: 1px; height: 12px; background: #808080; box-shadow: 1px 0 0 #fff; flex-shrink: 0; }
+    #statusbar .spacer { flex: 1; }
+
+    /* ── iPad keyboard shortcut bar ──
+       Shows below toolbar on iPad — quick-access buttons for common actions
+       that would normally need Ctrl combos */
+    #ipad-shortcut-bar {
+      display: none;
+      height: 36px; background: #b0b0b0; border-bottom: 1px solid #000;
+      flex-shrink: 0; align-items: center; padding: 0 4px; gap: 3px;
+      overflow-x: auto; overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      box-shadow: 0 1px 0 #fff;
+    }
+    #ipad-shortcut-bar::-webkit-scrollbar { height: 0; }
+
+    body.is-ipad #ipad-shortcut-bar { display: flex; }
+
+    .ipad-key {
+      height: 26px; padding: 0 10px; border: 1px solid #000;
+      background: var(--mac-bg); cursor: pointer;
+      font-size: 11px; font-family: var(--font-system); font-weight: bold; color: #000;
+      display: flex; align-items: center; white-space: nowrap; flex-shrink: 0;
+      box-shadow: 1px 1px 0 #fff inset, -1px -1px 0 #808080 inset;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ipad-key:active {
+      background: #909090;
+      box-shadow: 1px 1px 0 #808080 inset, -1px -1px 0 #fff inset;
+    }
+    .ipad-key.accent { background: #000080; color: #fff; box-shadow: 1px 1px 0 #4040a0 inset, -1px -1px 0 #000040 inset; }
+    .ipad-key.accent:active { background: #000060; }
+    #ipad-shortcut-bar .ksep { width: 1px; height: 20px; background: #808080; margin: 0 3px; flex-shrink: 0; }
+
+    /* ── Find bar ── */
+    #find-bar {
+      position: absolute; top: 6px; right: 8px;
+      background: var(--mac-bg); border: 2px solid #000;
+      padding: 8px 10px; display: none; gap: 6px; flex-direction: column;
+      z-index: 20; box-shadow: 2px 2px 0 #000, 1px 1px 0 #fff inset;
+      min-width: min(280px, 90vw);
+    }
+    #find-bar.open { display: flex; }
+    #find-bar .find-title {
+      font-size: 11px; font-weight: bold; font-family: var(--font-system);
+      border-bottom: 1px solid #808080; padding-bottom: 4px; margin-bottom: 2px;
+    }
+    #find-bar input {
+      height: 22px; background: #fff; border: 1px solid #000; color: #000;
+      padding: 0 4px; font-size: 12px; font-family: var(--font-mono);
+      outline: none; box-shadow: 1px 1px 0 #808080 inset; width: 100%;
+      -webkit-user-select: text; user-select: text;
+    }
+    .find-row { display: flex; gap: 4px; align-items: center; }
+    .find-row input { flex: 1; }
+    .find-btn {
+      padding: 0 10px; height: 26px; border: 1px solid #000;
+      background: var(--mac-bg); font-size: 11px; font-family: var(--font-system);
+      cursor: pointer; white-space: nowrap;
+      box-shadow: 1px 1px 0 #fff inset, -1px -1px 0 #808080 inset;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .find-btn:active { box-shadow: 1px 1px 0 #808080 inset, -1px -1px 0 #fff inset; background: #aaa; }
+    #find-count { font-size: 10px; color: #808080; white-space: nowrap; min-width: 54px; }
+
+    /* ── Welcome ── */
+    #welcome {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; padding: 30px; text-align: center;
+      background: #fff; font-family: var(--font-system);
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      -webkit-user-select: none; user-select: none;
+    }
+    #welcome h1 { font-size: 16px; font-weight: bold; }
+    #welcome p { font-size: 11px; color: #555; max-width: 320px; line-height: 1.7; }
+    #welcome .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    #welcome .shortcuts {
+      background: var(--mac-bg); border: 2px solid #000;
+      padding: 10px 16px; text-align: left; min-width: 260px; max-width: 340px; width: 100%;
+      box-shadow: 2px 2px 0 #000, 1px 1px 0 #fff inset;
+    }
+    #welcome .shortcuts h3 {
+      font-size: 10px; font-weight: bold; text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 6px; border-bottom: 1px solid #808080; padding-bottom: 4px;
+    }
+    #welcome .shortcuts .sk {
+      display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; gap: 12px;
+    }
+    #welcome .shortcuts kbd {
+      background: var(--mac-bg); border: 1px solid #000; border-radius: 2px;
+      padding: 0 5px; font-size: 10px; font-family: var(--font-system); box-shadow: 1px 1px 0 #808080;
+      white-space: nowrap;
+    }
+
+    /* ── Context menu ── */
+    #ctx-menu {
+      position: fixed; background: var(--mac-bg); border: 1px solid #000;
+      padding: 2px 0; z-index: 1000; display: none; min-width: 150px;
+      box-shadow: 2px 2px 0 #000, 1px 1px 0 #fff inset;
+    }
+    #ctx-menu.open { display: block; }
+    .ctx-item {
+      padding: 6px 20px; cursor: default; font-size: 12px;
+      font-family: var(--font-system); min-height: var(--touch-min);
+      display: flex; align-items: center;
+    }
+    .ctx-item:hover, .ctx-item:active { background: var(--mac-highlight); color: #fff; }
+    .ctx-sep { height: 1px; background: #808080; margin: 2px 4px; }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed; bottom: 24px; right: 12px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 5px; pointer-events: none;
+    }
+    .toast {
+      background: var(--mac-bg); border: 2px solid #000; padding: 8px 14px;
+      font-size: 11px; font-family: var(--font-system);
+      box-shadow: 2px 2px 0 #000, 1px 1px 0 #fff inset;
+      display: flex; align-items: center; gap: 8px;
+      animation: macSlideIn 0.2s ease; pointer-events: all; max-width: 280px;
+    }
+    .toast.success { border-left: 4px solid #000080; }
+    .toast.error   { border-left: 4px solid #800000; }
+    .toast.info    { border-left: 4px solid #808080; }
+    @keyframes macSlideIn {
+      from { transform: translateY(16px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+
+    /* ── iPad-specific layout tweaks ── */
+    body.is-ipad #menubar { height: 28px; }
+    body.is-ipad #ide-window { top: 28px; }
+    body.is-ipad .menu-item { font-size: 13px; padding: 0 12px; }
+    body.is-ipad #toolbar { height: 40px; }
+    body.is-ipad .mac-btn { height: 30px; font-size: 12px; }
+    body.is-ipad #search-box { height: 26px; font-size: 12px; }
+    body.is-ipad #title-bar { height: 30px; }
+    body.is-ipad #title-bar-text { font-size: 13px; }
+    body.is-ipad .win-btn { width: 20px; height: 20px; font-size: 11px; }
+    body.is-ipad #editor { font-size: 14px; line-height: 1.65; padding: 8px 12px; }
+    body.is-ipad #line-numbers { font-size: 14px; line-height: 1.65; width: 48px; }
+    body.is-ipad .tree-item { min-height: 32px; font-size: 13px; }
+    body.is-ipad .tab { min-height: 30px; font-size: 12px; }
+    body.is-ipad #statusbar { height: 22px; font-size: 11px; }
+    body.is-ipad #ipad-badge { display: block; }
+    body.is-ipad .dropdown-item { min-height: 38px; font-size: 13px; }
+
+    * { scrollbar-width: thin; scrollbar-color: #808080 #c0c0c0; }
+  </style>
+</head>
+<body>
+
+<!-- ── BOOT SCREEN ── -->
+<div id="boot-screen">
+  <div id="boot-card">
+    <div id="boot-top">
+      <svg id="boot-apple-svg" viewBox="0 0 220 270" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="apple-clip">
+            <path d="M110 30 C124 30 134 18 134 6 C118 8 104 20 110 30Z
+                     M70 50 C38 50 8 74 8 120 C8 168 40 220 68 244
+                     C82 256 96 248 110 248 C124 248 138 256 152 244
+                     C180 220 212 168 212 120 C212 74 182 50 150 50
+                     C136 50 126 62 110 62 C94 62 84 50 70 50Z"/>
+          </clipPath>
+        </defs>
+        <g clip-path="url(#apple-clip)">
+          <rect x="0" y="0"   width="220" height="44" fill="#61bb46"/>
+          <rect x="0" y="44"  width="220" height="44" fill="#fdb827"/>
+          <rect x="0" y="88"  width="220" height="44" fill="#f5821f"/>
+          <rect x="0" y="132" width="220" height="44" fill="#e03a3e"/>
+          <rect x="0" y="176" width="220" height="44" fill="#963d97"/>
+          <rect x="0" y="220" width="220" height="50" fill="#009ddc"/>
+        </g>
+      </svg>
+      <div id="boot-text-block">
+        <div id="boot-name">Mac IDE</div>
+        <div id="boot-num">9</div>
+      </div>
+    </div>
+    <div id="boot-bottom">
+      <div id="boot-starting-up">Starting up&hellip;</div>
+      <div id="boot-progress-track">
+        <div id="boot-progress-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <div id="desktop"></div>
+
+  <!-- Menu bar -->
+  <div id="menubar">
+    <div id="menubar-left">
+      <div id="apple-menu">&#63743;</div>
+
+      <div class="menu-wrap">
+        <div class="menu-item" onclick="toggleMenu('file-menu')">File</div>
+        <div class="dropdown" id="file-menu">
+          <div class="dropdown-item" onclick="openFolder();closeMenus()">Open Folder&hellip; <span class="shortcut">Ctrl+Shift+O</span></div>
+          <div class="dropdown-item" onclick="openFiles();closeMenus()">Open File&hellip; <span class="shortcut">Ctrl+O</span></div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" onclick="saveTab(activeTab());closeMenus()">Save <span class="shortcut">Ctrl+S</span></div>
+          <div class="dropdown-item" onclick="saveAllTabs();closeMenus()">Save All <span class="shortcut">Ctrl+Shift+S</span></div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" onclick="if(state.activeTabId)closeTab(state.activeTabId);closeMenus()">Close Tab <span class="shortcut">Ctrl+W</span></div>
+        </div>
+      </div>
+
+      <div class="menu-wrap">
+        <div class="menu-item" onclick="toggleMenu('edit-menu')">Edit</div>
+        <div class="dropdown" id="edit-menu">
+          <div class="dropdown-item" onclick="document.execCommand('cut');closeMenus()">Cut <span class="shortcut">Ctrl+X</span></div>
+          <div class="dropdown-item" onclick="document.execCommand('copy');closeMenus()">Copy <span class="shortcut">Ctrl+C</span></div>
+          <div class="dropdown-item" onclick="document.execCommand('paste');closeMenus()">Paste <span class="shortcut">Ctrl+V</span></div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" onclick="openFind();closeMenus()">Find / Replace&hellip; <span class="shortcut">Ctrl+F</span></div>
+        </div>
+      </div>
+
+      <div class="menu-wrap">
+        <div class="menu-item" onclick="toggleMenu('view-menu')">View</div>
+        <div class="dropdown" id="view-menu">
+          <div class="dropdown-item" onclick="document.getElementById('sidebar').classList.toggle('collapsed');closeMenus()">Toggle Sidebar <span class="shortcut">Ctrl+B</span></div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" onclick="changeFontSize(1);closeMenus()">Larger Text <span class="shortcut">Ctrl++</span></div>
+          <div class="dropdown-item" onclick="changeFontSize(-1);closeMenus()">Smaller Text <span class="shortcut">Ctrl+-</span></div>
+        </div>
+      </div>
+
+      <div class="menu-wrap">
+        <div class="menu-item" onclick="toggleMenu('help-menu')">Help</div>
+        <div class="dropdown" id="help-menu">
+          <div class="dropdown-item" onclick="toast('Mac IDE 9 -- Mac OS 9 Edition','info');closeMenus()">About Mac IDE</div>
+          <div class="dropdown-item" onclick="toast('Use Safari on iPad for best compatibility!','info',4000);closeMenus()">Browser Compatibility</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="menubar-right">
+      <span id="ipad-badge">iPad</span>
+      <span id="clock">12:00 PM</span>
+    </div>
+  </div>
+
+  <!-- IDE Window -->
+  <div id="ide-window">
+    <div id="title-bar">
+      <div class="win-btn">x</div>
+      <div class="win-btn">_</div>
+      <div class="win-btn">o</div>
+      <div id="title-bar-text">Mac IDE -- Untitled</div>
+    </div>
+
+    <!-- Main toolbar -->
+    <div id="toolbar">
+      <button class="mac-btn primary" id="btn-open-folder">Open Folder</button>
+      <button class="mac-btn" id="btn-open-file">Open File</button>
+      <div class="sep"></div>
+      <button class="mac-btn" id="btn-save">Save</button>
+      <button class="mac-btn" id="btn-save-all">Save All</button>
+      <div class="sep"></div>
+      <button class="mac-btn" id="btn-find">Find</button>
+      <div class="spacer"></div>
+      <input id="search-box" type="text" placeholder="Filter files..." />
+      <div class="sep"></div>
+      <button class="mac-btn" id="btn-toggle-sidebar">Sidebar</button>
+    </div>
+
+    <!-- iPad quick-key bar (hidden on desktop) -->
+    <div id="ipad-shortcut-bar">
+      <button class="ipad-key accent" onclick="saveTab(activeTab())">Save</button>
+      <button class="ipad-key" onclick="openFind()">Find</button>
+      <div class="ksep"></div>
+      <button class="ipad-key" onclick="ipadInsert('  ')">Tab</button>
+      <button class="ipad-key" onclick="ipadInsert('{  }')">{ }</button>
+      <button class="ipad-key" onclick="ipadInsert('()')">( )</button>
+      <button class="ipad-key" onclick="ipadInsert('[]')">[ ]</button>
+      <button class="ipad-key" onclick="ipadInsert('\"\"')">" "</button>
+      <button class="ipad-key" onclick="ipadInsert('\`\`')">`  `</button>
+      <div class="ksep"></div>
+      <button class="ipad-key" onclick="ipadInsert('=>')">=&gt;</button>
+      <button class="ipad-key" onclick="ipadInsert('!==')"!==</button>
+      <button class="ipad-key" onclick="ipadInsert('==='">===</button>
+      <button class="ipad-key" onclick="ipadInsert('&&')">&amp;&amp;</button>
+      <button class="ipad-key" onclick="ipadInsert('||')">||</button>
+      <div class="ksep"></div>
+      <button class="ipad-key" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">Sidebar</button>
+      <button class="ipad-key" onclick="if(state.activeTabId)closeTab(state.activeTabId)">Close Tab</button>
+    </div>
+
+    <div id="main">
+      <div id="sidebar">
+        <div id="sidebar-header"><span id="folder-name">EXPLORER</span></div>
+        <div id="file-tree">
+          <div class="tree-empty">No folder open.<br><br>Tap <strong>Open Folder</strong><br>to begin.</div>
+        </div>
+      </div>
+      <div id="resizer"></div>
+      <div id="editor-area">
+        <div id="tab-bar"></div>
+        <div id="editor-wrapper">
+          <div id="welcome">
+            <h1>Welcome to Mac IDE</h1>
+            <p>A Mac OS 9 style code editor.<br>Open a folder or file to start coding.</p>
+            <div class="actions">
+              <button class="mac-btn primary" onclick="document.getElementById('btn-open-folder').click()">Open Folder</button>
+              <button class="mac-btn" onclick="document.getElementById('btn-open-file').click()">Open File</button>
+            </div>
+            <div class="shortcuts">
+              <h3>Keyboard Shortcuts</h3>
+              <div class="sk"><span>Open Folder</span><kbd>Ctrl+Shift+O</kbd></div>
+              <div class="sk"><span>Open File</span><kbd>Ctrl+O</kbd></div>
+              <div class="sk"><span>Save</span><kbd>Ctrl+S</kbd></div>
+              <div class="sk"><span>Save All</span><kbd>Ctrl+Shift+S</kbd></div>
+              <div class="sk"><span>Find / Replace</span><kbd>Ctrl+F</kbd></div>
+              <div class="sk"><span>Close Tab</span><kbd>Ctrl+W</kbd></div>
+              <div class="sk"><span>Toggle Sidebar</span><kbd>Ctrl+B</kbd></div>
+              <div class="sk"><span>Next Tab</span><kbd>Ctrl+Tab</kbd></div>
+            </div>
+          </div>
+          <div id="editor-container" style="display:none">
+            <div id="line-numbers"></div>
+            <textarea id="editor" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+          </div>
+          <div id="find-bar">
+            <div class="find-title">Find &amp; Replace</div>
+            <div class="find-row">
+              <input id="find-input" type="text" placeholder="Find..." autocorrect="off" autocapitalize="off"/>
+              <span id="find-count"></span>
+              <button class="find-btn" id="find-prev">^</button>
+              <button class="find-btn" id="find-next">v</button>
+              <button class="find-btn" id="find-close">X</button>
+            </div>
+            <div class="find-row">
+              <input id="replace-input" type="text" placeholder="Replace..." autocorrect="off" autocapitalize="off"/>
+              <button class="find-btn" id="replace-one">Replace</button>
+              <button class="find-btn" id="replace-all">All</button>
+            </div>
+          </div>
+        </div>
+        <div id="statusbar">
+          <span id="st-lang">Plain Text</span>
+          <div class="sep"></div>
+          <span id="st-file" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40vw">No file open</span>
+          <div class="spacer"></div>
+          <span id="st-pos">Ln 1, Col 1</span>
+          <div class="sep"></div>
+          <span id="st-size"></span>
+          <div class="sep"></div>
+          <span>UTF-8</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-open">Open</div>
+  <div class="ctx-item" id="ctx-rename">Rename...</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ctx-close-tab">Close Tab</div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="ide.js"></script>
+<script>
+/* ── iPad detection ──────────────────────────────────────────────────────── */
+(function () {
+  var ua = navigator.userAgent;
+  var isIpad =
+    /iPad/.test(ua) ||
+    // iPadOS 13+ reports as Macintosh but has touch
+    (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+
+  if (isIpad) {
+    document.body.classList.add('is-ipad');
+    // Move ide-window top to match taller menubar
+    // (CSS handles this via body.is-ipad selectors)
+    console.log('Mac IDE: iPad detected, enabling touch optimisations.');
+  }
+  window.IS_IPAD = isIpad;
+}());
+
+/* ── iPad insert helper ─────────────────────────────────────────────────── */
+function ipadInsert(text) {
+  var ed = document.getElementById('editor');
+  if (!ed) return;
+  ed.focus();
+  var s = ed.selectionStart, e = ed.selectionEnd;
+  var v = ed.value;
+  ed.value = v.slice(0, s) + text + v.slice(e);
+  var pos = s + text.length;
+  ed.setSelectionRange(pos, pos);
+  ed.dispatchEvent(new Event('input'));
+}
+
+/* ── Boot progress bar ──────────────────────────────────────────────────── */
+(function () {
+  var fill = document.getElementById('boot-progress-fill');
+  var pct = 0;
+  var iv = setInterval(function () {
+    pct += 2 + Math.random() * 4;
+    if (pct >= 100) {
+      pct = 100;
+      fill.style.width = '100%';
+      clearInterval(iv);
+      setTimeout(function () {
+        var bs = document.getElementById('boot-screen');
+        bs.classList.add('fading');
+        setTimeout(function () {
+          bs.style.display = 'none';
+          document.getElementById('app').style.display = 'flex';
+        }, 560);
+      }, 480);
+    } else {
+      fill.style.width = pct + '%';
+    }
+  }, 110);
+}());
+
+/* ── Clock ──────────────────────────────────────────────────────────────── */
+function tick() {
+  var d = new Date(), h = d.getHours(), m = d.getMinutes();
+  var ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  document.getElementById('clock').textContent =
+    h + ':' + String(m).padStart(2, '0') + ' ' + ap;
+}
+tick();
+setInterval(tick, 10000);
+
+/* ── Dropdown menus ─────────────────────────────────────────────────────── */
+function toggleMenu(id) {
+  var t = document.getElementById(id);
+  var was = t.classList.contains('open');
+  document.querySelectorAll('.dropdown').forEach(function (d) { d.classList.remove('open'); });
+  document.querySelectorAll('.menu-wrap').forEach(function (w) { w.classList.remove('active'); });
+  if (!was) {
+    t.classList.add('open');
+    t.closest('.menu-wrap').classList.add('active');
+  }
+}
+function closeMenus() {
+  document.querySelectorAll('.dropdown').forEach(function (d) { d.classList.remove('open'); });
+  document.querySelectorAll('.menu-wrap').forEach(function (w) { w.classList.remove('active'); });
+}
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.menu-wrap')) closeMenus();
+});
+/* iPad: also close on touch outside */
+document.addEventListener('touchend', function (e) {
+  if (!e.target.closest('.menu-wrap') && !e.target.closest('.dropdown')) closeMenus();
+}, { passive: true });
+
+/* ── Font size ──────────────────────────────────────────────────────────── */
+var fontSize = window.IS_IPAD ? 14 : 13;
+function changeFontSize(d) {
+  fontSize = Math.max(9, Math.min(28, fontSize + d));
+  document.getElementById('editor').style.fontSize = fontSize + 'px';
+  document.getElementById('line-numbers').style.fontSize = fontSize + 'px';
+}
+
+/* ── Sidebar touch-drag (iPad) ──────────────────────────────────────────── */
+(function () {
+  var resizer = document.getElementById('resizer');
+  var sidebar = document.getElementById('sidebar');
+  var dragging = false, startX = 0, startW = 0;
+
+  resizer.addEventListener('touchstart', function (e) {
+    dragging = true;
+    startX = e.touches[0].clientX;
+    startW = sidebar.offsetWidth;
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function (e) {
+    if (!dragging) return;
+    var w = Math.max(100, Math.min(400, startW + e.touches[0].clientX - startX));
+    sidebar.style.width = w + 'px';
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchend', function () { dragging = false; });
+}());
+</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a01e6987dfbc4e91',t:'MTc3OTgxNTYyNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
